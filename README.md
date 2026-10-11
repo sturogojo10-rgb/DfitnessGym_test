@@ -20,22 +20,23 @@ docker run --rm --name dfitness-gym -p 8080:8080 --env-file .env dfitness-gym
 
 Open <http://localhost:8080>. The database is not included in the image; run migrations with `docker exec -it dfitness-gym php artisan migrate --force` after starting the container.
 
-For a Render deployment using SQLite:
+For a Render deployment, use a Render PostgreSQL database. The free web-service filesystem is ephemeral, so a SQLite file stored in the container is not persistent across replacements.
 
-1. Add a Render persistent disk to the web service, mounted at `/var/www/html/storage/app`.
+1. Create a Render PostgreSQL database and connect it to the web service.
 2. Set these service environment variables:
 
    ```text
    APP_ENV=production
    APP_DEBUG=false
-   DB_CONNECTION=sqlite
-   DB_DATABASE=/var/www/html/storage/app/database.sqlite
+   DB_CONNECTION=pgsql
+   DB_URL=<the PostgreSQL URL provided by Render>
+   LOG_CHANNEL=stderr
    SESSION_DRIVER=file
    CACHE_STORE=file
    QUEUE_CONNECTION=sync
    ```
 
-   Also set the production `APP_URL` and a generated `APP_KEY`. Render environment settings override image defaults.
-3. Deploy, then use the Render Shell to run `php artisan migrate --force` once the disk is mounted. This creates the Laravel tables in the persistent SQLite database.
+   Also set the production `APP_URL` and `APP_KEY`. Render environment settings override image defaults. Keep `DB_URL` secret and use the database's internal URL for the deployed service.
+3. Deploy. `LOG_CHANNEL=stderr` makes Laravel exceptions visible in the Render service logs. The Free plan does not provide a service shell, so run database migrations from a trusted local checkout using the database's external URL in its local `.env`, then restore the normal local database settings. Do not commit database URLs or credentials.
 
-The image creates the SQLite file at startup if it does not already exist. The persistent disk keeps the database across deploys; without it, the database file is lost when Render replaces the container. Back up and review pending migrations before running them against a database with existing data. In particular, `2026_10_07_000001_remove_rejected_member_accounts` deletes rejected member rows when it runs.
+Back up and review pending migrations before running them against a database with existing data. In particular, `2026_10_07_000001_remove_rejected_member_accounts` deletes rejected member rows when it runs. The Docker image does not run migrations automatically.
