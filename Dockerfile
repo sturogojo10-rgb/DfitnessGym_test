@@ -16,8 +16,11 @@ RUN apt-get update \
         libjpeg62-turbo-dev \
         libonig-dev \
         libpng-dev \
+        libpq-dev \
+        libzip-dev \
+        unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd mbstring pdo_mysql \
+    && docker-php-ext-install -j"$(nproc)" gd mbstring pdo_mysql pdo_pgsql zip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
