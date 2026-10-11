@@ -1,24 +1,32 @@
-FROM php:8.2-fpm
+# ... (your Node.js assets stage up above) ...
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git curl unzip libpq-dev libonig-dev libzip-dev zip \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip
+FROM php:8.3-apache
 
-# Install Composer
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
+        libonig-dev \
+        libpng-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" gd mbstring pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
+
+# Paste the updated block right here:
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
+RUN sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
+    && sed -ri 's/Listen 80/Listen ${PORT}/g' /etc/apache2/ports.conf \
+    && sed -ri 's/:80/:${PORT}/g' /etc/apache2/sites-available/000-default.conf \
+    && printf '%s\n' \
+        '<Directory /var/www/html/public>' \
+        '    AllowOverride All' \
+        '    Require all granted' \
+        '</Directory>' \
+        > /etc/apache2/conf-available/laravel.conf \
+    && a2enconf laravel \
+    && a2enmod rewrite
 
-# Copy app files
-COPY . .
+WORKDIR /var/www/html
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
-
-# Laravel setup
-RUN php artisan config:clear && \
-    php artisan route:clear && \
-    php artisan view:clear
-
-CMD ["php-fpm"]
+# ... (the rest of your COPY and RUN composer commands below) ...
